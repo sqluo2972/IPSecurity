@@ -37,6 +37,7 @@ def output(request):
     for item in host['vulns']:
         CVE = item.replace('!','')
             #print ('Vulns: %s' % item)
+        inf += '\nVulns:' + CVE + '\n'
         inf += Get_Cve_Description(CVE)    #把該ip的CVE印出來                   
         inf += Get_Cve_NVD(CVE)
         inf += Get_Cve_Id(CVE)
@@ -65,7 +66,8 @@ def Get_Cve_Description(CVE):
     url = "https://cve.mitre.org/cgi-bin/cvename.cgi?name="+CVE   #CVE官網關鍵字查詢
     html_text = getHtmlText(url);
     soup = BeautifulSoup(html_text,'html.parser')
-    Description = soup.find_all('tr')[9].find('td').string  #CVE Description
+    Description = '描述\n'
+    Description += soup.find_all('tr')[9].find('td').string  #CVE Description
     #print(Description)
     return Description
 
