@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+
+<html>
+	<head>
+		<meta charset="UTF-8">
+		{% block title %}<title>VulnerabilityScanner</title>{% endblock %}
+		<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+		<meta name="description" content="" />
+		<meta name="keywords" content="" />
+		<!-- Add additional CSS in static file -->
+		{% load static %}
+		<script src="{% static 'js/jquery.min.js' %}"></script>
+		<script src="{% static 'js/skel.min.js' %}"></script>
+		<script src="{% static 'js/skel-layers.min.js' %}"></script>
+		<script src="{% static 'js/init.js' %}"></script>		
+			
+		<link rel="stylesheet" href="{% static 'css/skel.css' %}" />
+		<link rel="stylesheet" href="{% static 'css/style.css' %}" />
+		<link rel="stylesheet" href="{% static 'css/style-xlarge.css' %}" />
+		
+	</head>
+	<body>
+
+		<!-- Header -->
+			<header id="header">
+				<h1><a href="index.html">VulnerabilityScanner</a></h1>
+			</header>
+
+		<!-- Main -->
+			<section id="main" class="wrapper">
+				<div class="container">
+					<header class="major">
+						<h2>Vulnerability</h2>
+						<p>Defend Against Exploits</p>
+					</header>
+					<!-- Content -->
+					{% block content %}
+					{% endblock %}
+					<!-- Lists -->
+					<section>
+						<h3>網站簡介</h3>
+						<div class="row">
+							<div class="6u 12u(3)">
+								<h4>弱點分析工具</h4>
+								<ul>
+									<li>NVD</li>
+									<li>CVE</li>
+									<li>VulDB</li>
+								</ul>
+								<h4>應用</h4>
+								
+									<h5>此網站利用使用者ip分析個人電腦潛在的漏洞，並透過各種工具分析與測試來顯示最終的漏洞報告，加強使用者電腦的防禦能力，減少駭客入侵的風險</h5>
+									
+								
+							</div>
+							<div class="6u 12u(3)">
+								<h4>滲透測試工具</h4>
+								<ul>
+									<li>ExploitDB</li>
+								</ul>
+								<h4>Github</h4>
+								<ul class="icons">
+									<li><a href="#" class="icon rounded fa-github"><span class="label">Github</span></a></li>
+								</ul>
+							</div>
+						</div>
+
+					</section>
+					
+				</div>
+			</section>
+			
+	</body>
+</html>

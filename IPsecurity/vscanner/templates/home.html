@@ -1,0 +1,14 @@
+{% extends "base_generic.html" %}
+<!-- Add additional CSS in static file -->
+{% load static %}
+
+{% block content %}
+	<button onclick="location.href='{% url 'script' %}'">Execute Script</button> <hr>
+	{% if data %}
+		
+	{{data|linebreaks}}
+	
+	
+	{% endif %}
+
+{% endblock %}
