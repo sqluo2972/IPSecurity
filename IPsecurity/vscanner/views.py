@@ -4,6 +4,7 @@ import json
 import random
 from bs4 import BeautifulSoup 
 import shodan
+import re
 # Create your views here.
 
 
@@ -27,12 +28,12 @@ def output(request):
     inf += "IP: %s \n" % host['ip_str']
     inf += "Organization: %s\n" % host.get('org', 'n/a')
     inf += "Operating System: %s \n" % host.get('os', 'n/a')
-    
+    inf += "Country:" + str(host.get('country_name', 'n/a'))
     # Print all banners
     for item in host['data']:
         #print ("Port: %s" % item['port'])  #把開啟的port印出來
         inf += "Port: %s\n" % item['port']
-
+        
     # Print vuln information
     for item in host['vulns']:
         CVE = item.replace('!','')
@@ -46,11 +47,9 @@ def output(request):
     print(data)
     return render(request,'home.html',{'data':data})
  
-
-
-
-
-
+    
+ 
+    
 ### function()       
 def getHtmlText(url):
     try:
@@ -103,10 +102,6 @@ def Get_Cve_NVD(CVE):
     allNVD += Score + Solution + Weakness + KnownAffected
     return allNVD
 
-
-
-
-
 def Get_Cve_Id(CVE):  # CVE 輸入格式 'CVE-2020-4345'
     a = ['def90f54511b9b12894314a961724e62', 'e87acbed256eeb137a54c3a486b480c2', 'b0861f726686ebdff3a848c1a3415c3f',
          '9a78845be67b920c66e07b2c720feddd', '92cfd178f914dfc17ea5672fac1e47a0']
@@ -127,6 +122,8 @@ def Get_Cve_Id(CVE):  # CVE 輸入格式 'CVE-2020-4345'
     return ID
 
 
+
+
 def Get_Cve_vulDB(vuldb):
     Price = ""
     urlvuldb = 'https://vuldb.com/?id.' + vuldb
@@ -135,3 +132,48 @@ def Get_Cve_vulDB(vuldb):
     detal = sp.select(".hideonphonesmall.price1")
     Price += "Current Exploit Price≈:" + detal[0].text + '\n'
     return Price
+
+
+#SecurityFocus:
+def Get_Cve_NEW(CVE):
+    urlNVD='https://cve.mitre.org/cgi-bin/cvename.cgi?name='+CVE
+    res=requests.get(urlNVD)
+    sp=BeautifulSoup(res.text,'html.parser')
+    detal=sp.find_all("a",string=re.compile("^URL:http://www.securityfocus.com"))
+    SecurityFocus=""
+    SecurityFocus="SecurityFocus:"+'\n'
+    if len(detal)!=0:
+        SecurityFocus+=detal[0].text.split(":", 1)[1]+'\n'
+        return SecurityFocus   #回傳URL
+    else:
+        return SecurityFocus
+
+
+
+#exploits:
+def Get_Cve_EX(CVE):
+    urlNVD='https://cve.mitre.org/cgi-bin/cvename.cgi?name='+CVE
+    res=requests.get(urlNVD)
+    sp=BeautifulSoup(res.text,'html.parser')
+    detal=sp.find_all("a",string=re.compile("^URL:http://www.exploit-db.com/exploits/"))
+    exploits=""
+    exploits="exploits:"+'\n'
+    if len(detal)!=0:
+        exploits+=detal[0].text.split(":", 1)[1]+'\n'
+        return exploits  #回傳URL
+    else :
+        return exploits
+
+#stackoverflow:
+
+def stackoverflow(CVE):
+    new_cve=CVE.split('-',1)[1]
+    urlstackoverflow="https://stackoverflow.com/search?q=CVE+"+new_cve
+    res=requests.get(urlstackoverflow)
+    sp=BeautifulSoup(res.text,'html.parser')
+    aaa=sp.select('.result-link a')
+    stackoverflow=""
+    stackoverflow+="stackoverflow:"+'\n'
+    for i in range(len(aaa)):
+        stackoverflow+="https://stackoverflow.com"+aaa[i]['href']+'\n'
+    return stackoverflow   #回傳URL
