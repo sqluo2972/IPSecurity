@@ -3,12 +3,19 @@
 {% load static %}
 
 {% block content %}
-	<button onclick="location.href='{% url 'script' %}'">Execute Script</button> <hr>
+	<form action="output" method="post">
+		{% csrf_token %}
+		Input IP:
+		<input placeholder="input Ip address" type="text" name="param" required><br><br>		
+		<br>
+		<input type="submit" value="Search">
+	</form>
+	
 	{% if data %}
 		
 	{{data|linebreaks}}
 	
 	
 	{% endif %}
-
+	
 {% endblock %}

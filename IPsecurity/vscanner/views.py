@@ -21,7 +21,7 @@ def output(request):
     
    # First we need to resolve our targets domain to an IP
     #resolved = requests.get(dnsResolve)        #抓ip地址
-    hostIP = '216.58.41.203'                  #因為找不到學校ip 不然應該用resolved.json()[target]
+    hostIP = request.POST.get('param')         #input
     inf = ""
     # Then we need to do a Shodan search on that IP
     host = api.host(hostIP)
@@ -41,7 +41,7 @@ def output(request):
         inf += '\nVulns:' + CVE + '\n'
         inf += Get_Cve_Description(CVE)    #把該ip的CVE印出來                   
         inf += Get_Cve_NVD(CVE)
-        inf += Get_Cve_Id(CVE)
+      
         
     data = inf
     print(data)
@@ -102,36 +102,8 @@ def Get_Cve_NVD(CVE):
     allNVD += Score + Solution + Weakness + KnownAffected
     return allNVD
 
-def Get_Cve_Id(CVE):  # CVE 輸入格式 'CVE-2020-4345'
-    a = ['def90f54511b9b12894314a961724e62', 'e87acbed256eeb137a54c3a486b480c2', 'b0861f726686ebdff3a848c1a3415c3f',
-         '9a78845be67b920c66e07b2c720feddd', '92cfd178f914dfc17ea5672fac1e47a0']
-    i = random.randint(0, 4)
-    personalApiKey = a[i]
-    userAgent = 'VulDB API Advanced Python Demo Agent'
-    headers = {'User-Agent': userAgent, 'X-VulDB-ApiKey': personalApiKey}
-    url = 'https://vuldb.com/?api'
-    search = 'cve:' + CVE
-    postData = {'advancedsearch': search}
-    response = requests.post(url, headers=headers, data=postData)
-    ID = ""
-    ID += "vulDB:" + '\n'
-    if response.status_code == 200:
-        responseJson = json.loads(response.content)
-        for i in responseJson['result']:
-            ID += 'https://vuldb.com/?id.' + str(i['entry']['id']) + '\n'  # 得到搜尋結果的id
-    return ID
 
 
-
-
-def Get_Cve_vulDB(vuldb):
-    Price = ""
-    urlvuldb = 'https://vuldb.com/?id.' + vuldb
-    html = requests.get(urlvuldb)
-    sp = BeautifulSoup(html.text, 'html.parser')
-    detal = sp.select(".hideonphonesmall.price1")
-    Price += "Current Exploit Price≈:" + detal[0].text + '\n'
-    return Price
 
 
 #SecurityFocus:
