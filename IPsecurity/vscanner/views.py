@@ -1,10 +1,14 @@
 from django.shortcuts import render
 import requests
-import json
-import random
+from queue import Queue
 from bs4 import BeautifulSoup 
 import shodan
 import re
+from fake_useragent import UserAgent
+from collections import Counter
+import numpy as np
+import matplotlib.pyplot as plt
+import threading
 # Create your views here.
 
 
@@ -22,26 +26,27 @@ def output(request):
    # First we need to resolve our targets domain to an IP
     #resolved = requests.get(dnsResolve)        #抓ip地址
     hostIP = request.POST.get('param')         #input
-    inf = ""
+    inf = ""                                   #儲存字串
     # Then we need to do a Shodan search on that IP
     host = api.host(hostIP)
     inf += "IP: %s \n" % host['ip_str']
     inf += "Organization: %s\n" % host.get('org', 'n/a')
     inf += "Operating System: %s \n" % host.get('os', 'n/a')
     inf += "Country:" + str(host.get('country_name', 'n/a'))
-    # Print all banners
+   
+    #print port
     for item in host['data']:
         #print ("Port: %s" % item['port'])  #把開啟的port印出來
         inf += "Port: %s\n" % item['port']
         
+    CVSS = list()     #儲存CVSS
+    cwelist = list()    #儲存所有cwe
     # Print vuln information
     for item in host['vulns']:
         CVE = item.replace('!','')
             #print ('Vulns: %s' % item)
         inf += '\nVulns:' + CVE + '\n'
-        inf += Get_Cve_Description(CVE)    #把該ip的CVE印出來                   
-        inf += Get_Cve_NVD(CVE)
-      
+        inf += multithreading(CVE,CVSS,cwelist)     #多線程爬取資料
         
     data = inf
     print(data)
@@ -50,7 +55,40 @@ def output(request):
     
  
     
-### function()       
+### function()  
+def multithreading(CVE,CVSS,cwelist):
+    Q =Queue()         #FIFO 
+   
+    Description= threading.Thread(target=Get_Cve_Description, args =(CVE,Q))
+    NVD= threading.Thread(target=Get_Cve_NVD, args =(CVE,CVSS,cwelist,Q))
+    stackoverflow=threading.Thread(target=Get_Cve_stackoverflow, args =(CVE,Q))
+    NEW=threading.Thread(target=Get_Cve_NEW, args =(CVE,Q))
+    EX=threading.Thread(target=Get_Cve_EX, args =(CVE,Q))
+    packetstormsecurity=threading.Thread(target=Get_Cve_packetstormsecurity, args =(CVE,Q))
+    
+    Description.start()
+    NVD.start()
+    stackoverflow.start()
+    NEW.start()
+    EX.start()
+    packetstormsecurity.start()
+       
+    Description.join()
+    NVD.join()
+    stackoverflow.join()
+    NEW.join()
+    EX.join()
+    packetstormsecurity.join()
+    
+    inf = ""
+    for _ in range(Q.qsize()):
+        inf += Q.get()
+        
+    return inf 
+   
+    
+
+     
 def getHtmlText(url):
     try:
         r = requests.get(url,timeout = 30)
@@ -61,84 +99,79 @@ def getHtmlText(url):
         return "Error"
     return ""
 
-def Get_Cve_Description(CVE):
+def Get_Cve_Description(CVE,q):     # q = Queue
     url = "https://cve.mitre.org/cgi-bin/cvename.cgi?name="+CVE   #CVE官網關鍵字查詢
     html_text = getHtmlText(url);
     soup = BeautifulSoup(html_text,'html.parser')
     Description = '描述\n'
     Description += soup.find_all('tr')[9].find('td').string  #CVE Description
     #print(Description)
-    return Description
+    q.put(Description)
+    #return Description
 
-def Get_Cve_NVD(CVE):
-    urlNVD = 'https://nvd.nist.gov/vuln/detail/' + CVE
-    html_text = getHtmlText(urlNVD);
-    sp = BeautifulSoup(html_text, 'html.parser')
-
-    Score = ""
-    detal = sp.select(".severityDetail")
-    Score += "CVSS 3.x:" + detal[0].text + '\n' + "CVSS 2.0:" + detal[1].text + '\n'
-
-    Solution = ""
-    Solution = "對諮詢，解決方案和工具的引用:" + '\n'
-    detal = sp.select(
-        "#p_lt_WebPartZone1_zoneCenter_pageplaceholder_p_lt_WebPartZone1_zoneCenter_VulnerabilityDetail_VulnFormView_VulnHyperlinksPanel table.table-striped.table-condensed.table-bordered.detail-table a")
+def Get_Cve_NVD(CVE,CVSS,cwelist,q):
+    urlNVD='https://nvd.nist.gov/vuln/detail/'+CVE
+    res=requests.get(urlNVD)
+    sp=BeautifulSoup(res.text,'html.parser')
+   
+    Score=""
+    detal=sp.select(".severityDetail")
+    if detal[0].text!=' N/A':
+        Score+="CVSS 3.x:"+detal[0].text.replace('\n','')+'\n'+Get_Cve_CVSSdetail3X(CVE)+"CVSS 2.0:"+detal[1].text+'\n'+Get_Cve_CVSSdetail20(CVE)
+    else:
+        Score+="CVSS 3.x:"+detal[0].text+'\n'+Get_Cve_CVSSdetail3X(CVE)+"CVSS 2.0:"+detal[1].text+'\n'+Get_Cve_CVSSdetail20(CVE)
+   
+    CVSS.append(detal[1].text.split(' ')[2])
+    Solution="對諮詢，解決方案和工具的引用:"+'\n'
+    detal=sp.select("#vulnHyperlinksPanel table.table-striped.table-condensed.table-bordered.detail-table a")
     for i in range(len(detal)):
-        Solution += detal[i].text + '\n'
-
-    Weakness = ""
-    Weakness =  "弱點枚舉:" + '\n'
-    detal = sp.select(
-        "#p_lt_WebPartZone1_zoneCenter_pageplaceholder_p_lt_WebPartZone1_zoneCenter_VulnerabilityDetail_VulnFormView_VulnTechnicalDetailsDiv table.table-striped.table-condensed.table-bordered.detail-table a")
+        Solution+=detal[i].text+'\n'
+      
+    Weakness="弱點枚舉:"+'\n'
+    detal=sp.select("#vulnTechnicalDetailsDiv table.table-striped.table-condensed.table-bordered.detail-table a")
     for i in range(len(detal)):
-        Weakness += detal[i].text + ":" + '\n' + detal[i]['href'] + '\n'
-
-    KnownAffected = ""
-    KnownAffected =  "已知受影響的軟件配置:" + '\n'
-    detal = sp.select(".vulnerable")
-    for i in range(len(detal)):
-        KnownAffected += "配置" + str(i + 1) + ":" + '\n' + detal[i].text.replace(" \xa0", '').replace("\n", '') + '\n'
-    allNVD = ""
-    allNVD += Score + Solution + Weakness + KnownAffected
-    return allNVD
-
-
-
-
-
-#SecurityFocus:
-def Get_Cve_NEW(CVE):
+        Weakness+=detal[i].text+":"+'\n'+detal[i]['href']+'\n'
+        cwelist.append(detal[i].text)
+   
+    allNVD =Score+Solution+Weakness    
+    q.put(allNVD)
+    #return allNVD
+    
+    
+#Security Focus
+def Get_Cve_NEW(CVE,q):
     urlNVD='https://cve.mitre.org/cgi-bin/cvename.cgi?name='+CVE
     res=requests.get(urlNVD)
     sp=BeautifulSoup(res.text,'html.parser')
     detal=sp.find_all("a",string=re.compile("^URL:http://www.securityfocus.com"))
-    SecurityFocus=""
     SecurityFocus="SecurityFocus:"+'\n'
     if len(detal)!=0:
         SecurityFocus+=detal[0].text.split(":", 1)[1]+'\n'
-        return SecurityFocus   #回傳URL
-    else:
-        return SecurityFocus
-
-
+        q.put(SecurityFocus)
+        #return SecurityFocus
+    else :
+        SecurityFocus = "SecurityFocus:NONE!"+'\n'
+        q.put(SecurityFocus)
+        #return ("SecurityFocus:NONE!"+'\n')
 
 #exploits:
-def Get_Cve_EX(CVE):
+def Get_Cve_EX(CVE,q):
     urlNVD='https://cve.mitre.org/cgi-bin/cvename.cgi?name='+CVE
     res=requests.get(urlNVD)
     sp=BeautifulSoup(res.text,'html.parser')
     detal=sp.find_all("a",string=re.compile("^URL:http://www.exploit-db.com/exploits/"))
-    exploits=""
-    exploits="exploits:"+'\n'
+    exploits="Exploits:"+'\n'
     if len(detal)!=0:
         exploits+=detal[0].text.split(":", 1)[1]+'\n'
-        return exploits  #回傳URL
+        #return exploits
     else :
-        return exploits
+        exploits = "Exploits:NONE!"+'\n'
+        q.put(exploits)
+        #return ("Exploits:NONE!"+'\n')
 
 #stackoverflow:
 
-def stackoverflow(CVE):
+def Get_Cve_stackoverflow(CVE,q):
     new_cve=CVE.split('-',1)[1]
     urlstackoverflow="https://stackoverflow.com/search?q=CVE+"+new_cve
     res=requests.get(urlstackoverflow)
@@ -148,4 +181,202 @@ def stackoverflow(CVE):
     stackoverflow+="stackoverflow:"+'\n'
     for i in range(len(aaa)):
         stackoverflow+="https://stackoverflow.com"+aaa[i]['href']+'\n'
-    return stackoverflow   #回傳URL
+    if len(aaa)==0:
+        stackoverflow = "Stackoverflow:NONE!"+'\n'
+    q.put(stackoverflow)
+    #return stackoverflow   #回傳URL
+
+
+def Get_Cve_packetstormsecurity(CVE,q):
+    urlCVE="https://packetstormsecurity.com/search/?q="+CVE
+    res=requests.get(urlCVE)
+    sp=BeautifulSoup(res.text,'html.parser')
+    Description = sp.select("dt a")
+    aaa="Packetstormsecurity:"+'\n'
+    for i in range(len(Description)):
+        aaa+="https://packetstormsecurity.com"+Description[i]['href']+'\n'
+    if len(Description)!=0:
+        q.put(aaa)
+        #return aaa
+    else:
+        q.put("Packetstormsecurity:NONE!"+'\n')
+        #return ("Packetstormsecurity:NONE!"+'\n')
+def Get_Cve_CVSSdetail20(CVE):
+    urlCVE="https://nvd.nist.gov/vuln/detail/"+CVE
+    res=requests.get(urlCVE)
+    sp=BeautifulSoup(res.text,'html.parser')
+    Description = sp.select("#vulnCvssPanel span .tooltipCvss2NistMetrics")
+    CVSSdetail=""
+    if len(Description)==0:
+        return ("NO CVSS 2.0"+'\n')
+    else:
+        a=Description[0].text.replace("(","").replace(")","").split('/')
+        if a[0].split(":")[1]=="L":
+            CVSSdetail+="Access Vector(攻擊向量):"+"Local(在不連接網路的狀況下進行攻擊)"+'\n'
+        elif a[0].split(":")[1]=="A":
+            CVSSdetail+="Access Vector(攻擊向量):"+"Adjacent Network(由受限制的網路進行攻擊，如區域網路及藍芽等)"+'\n'
+        elif a[0].split(":")[1]=="N":
+            CVSSdetail+="Access Vector(攻擊向量):"+"Network(由網際網路網路進行攻擊)"+'\n'
+           
+        if a[1].split(":")[1]=="H":
+            CVSSdetail+="Access Complexity(攻擊複雜度):"+"HIGH"+'\n'
+        elif a[1].split(":")[1]=="M":
+            CVSSdetail+="Access Complexity(攻擊複雜度):"+"Medium"+'\n'
+        elif a[1].split(":")[1]=="L":
+            CVSSdetail+="Access Complexity(攻擊複雜度):"+"LOW"+'\n'
+
+        if a[2].split(":")[1]=="M":
+            CVSSdetail+="Authentication(認證方式):"+"Multiple(此漏洞需要攻擊者進行兩次或兩次以上的身份驗證)"+'\n'
+        elif a[2].split(":")[1]=="S":
+            CVSSdetail+="Authentication(認證方式):"+"Single(該漏洞要求攻擊者登錄到系統中)"+'\n'
+        elif a[2].split(":")[1]=="N":
+            CVSSdetail+="Authentication(認證方式):"+"NONE"+'\n'
+
+        if a[3].split(":")[1]=="N":
+            CVSSdetail+="Confidentiality Impact(機密性影響):"+"NONE"+'\n'
+        elif a[3].split(":")[1]=="P":
+            CVSSdetail+="Confidentiality Impact(機密性影響):"+"Partial(攻擊者可以取得機密資料，但無法使用該資料)"+'\n'
+        elif a[3].split(":")[1]=="C":
+            CVSSdetail+="Confidentiality Impact(機密性影響):"+"Complete(攻擊者可以取得機密資料，且可以使用該資料)"+'\n'
+
+        if a[4].split(":")[1]=="N":
+            CVSSdetail+="Integrity Impact(完整性影響):"+"NONE"+'\n'
+        elif a[4].split(":")[1]=="P":
+            CVSSdetail+="Integrity Impact(完整性影響):"+"Partial(攻擊者有部分權限以竄改某些資料，對含有漏洞之元件影響較小)"+'\n'
+        elif a[4].split(":")[1]=="C":
+            CVSSdetail+="Integrity Impact(完整性影響):"+"Complete(攻擊者有權限竄改所有資料，對含有漏洞之元件有嚴重影響)"+'\n'
+       
+        if a[5].split(":")[1]=="N":
+            CVSSdetail+="Availability Impact(可用性影響):"+"NONE"+'\n'
+        elif a[5].split(":")[1]=="P":
+            CVSSdetail+="Availability Impact(可用性影響):"+"Partial(可用性受到影響，導致服務或元件仍可被部分取得，或是時好時壞)"+'\n'
+        elif a[5].split(":")[1]=="C":
+            CVSSdetail+="Availability Impact(可用性影響):"+"Complete(攻擊者有權限竄改所有資料，對含有漏洞之元件有嚴重影響)"+'\n'
+       
+        return CVSSdetail
+   
+def Get_Cve_CVSSdetail3X(CVE):
+    urlCVE="https://nvd.nist.gov/vuln/detail/"+CVE
+    res=requests.get(urlCVE)
+    sp=BeautifulSoup(res.text,'html.parser')
+    Description = sp.select("#vulnCvssPanel span .tooltipCvss3NistMetrics")
+    CVSSdetail=""
+    if len(Description)==0:
+        return ("NO CVSS 3.X"+'\n')
+    else:
+        a=Description[0].text.split("/")
+        if a[1].split(":")[1]=="N":
+            CVSSdetail+="Attack Vector(攻擊向量):"+"Network(由網際網路網路進行攻擊)"+'\n'
+        elif a[1].split(":")[1]=="A":
+            CVSSdetail+="Attack Vector(攻擊向量):"+"Adjacent(由受限制的網路進行攻擊，如區域網路及藍芽等)"+'\n'
+        elif a[1].split(":")[1]=="L":
+            CVSSdetail+="Attack Vector(攻擊向量):"+"Local(在不連接網路的狀況下進行攻擊)"+'\n'
+        elif a[1].split(":")[1]=="P":
+            CVSSdetail+="Attack Vector(攻擊向量):"+"Physical(需接觸到實體機器才能進行攻擊)"+'\n'
+
+        if a[2].split(":")[1]=="L":
+            CVSSdetail+="Attack Complexity(攻擊複雜度):"+"LOW"+'\n'
+        elif a[2].split(":")[1]=="H":
+            CVSSdetail+="Attack Complexity(攻擊複雜度):"+"HIGH"+'\n'
+
+        if a[3].split(":")[1]=="N":
+            CVSSdetail+="Privileges Required(是否需要提權):"+"NONE"+'\n'
+        elif a[3].split(":")[1]=="L":
+            CVSSdetail+="Privileges Required(是否需要提權):"+"LOW"+'\n'
+        elif a[3].split(":")[1]=="H":
+            CVSSdetail+="Privileges Required(是否需要提權):"+"HIGH"+'\n'
+
+        if a[4].split(":")[1]=="N":
+            CVSSdetail+="User Interaction(是否需要使用者操作):"+"NONE"+'\n'
+        elif a[4].split(":")[1]=="R":
+            CVSSdetail+="User Interaction(是否需要使用者操作):"+"Required"+'\n'
+
+        if a[5].split(":")[1]=="U":
+            CVSSdetail+="Scope(影響範圍):"+"Unchanged(僅影響含有漏洞的元件本身)"+'\n'
+        elif a[5].split(":")[1]=="C":
+            CVSSdetail+="Scope(影響範圍):"+"Changed(會影響到含有漏洞的元件以外的元件)"+'\n'
+
+        if a[6].split(":")[1]=="N":
+            CVSSdetail+="Confidentiality(機密性影響):"+"NONE"+'\n'
+        elif a[6].split(":")[1]=="L":
+            CVSSdetail+="Confidentiality(機密性影響):"+"LOW(攻擊者可以取得機密資料，但無法使用該資料)"+'\n'
+        elif a[6].split(":")[1]=="H":
+            CVSSdetail+="Confidentiality(機密性影響):"+"HIGH(攻擊者可以取得機密資料，且可以使用該資料)"+'\n'
+
+        if a[7].split(":")[1]=="N":
+            CVSSdetail+="Integrity(完整性影響):"+"NONE"+'\n'
+        elif a[7].split(":")[1]=="L":
+            CVSSdetail+="Integrity(完整性影響):"+"LOW(攻擊者有部分權限以竄改某些資料，對含有漏洞之元件影響較小)"+'\n'
+        elif a[7].split(":")[1]=="H":
+            CVSSdetail+="Integrity(完整性影響):"+"HIGH(攻擊者有權限竄改所有資料，對含有漏洞之元件有嚴重影響)"+'\n'
+
+        if a[8].split(":")[1]=="N":
+            CVSSdetail+="Availability(可用性影響):"+"NONE"+'\n'
+        elif a[8].split(":")[1]=="L":
+            CVSSdetail+="Availability(可用性影響):"+"LOW(可用性受到影響，導致服務或元件仍可被部分取得，或是時好時壞)"+'\n'
+        elif a[8].split(":")[1]=="H":
+            CVSSdetail+="Availability(可用性影響):"+"HIGH(攻擊者有權限竄改所有資料，對含有漏洞之元件有嚴重影響)"+'\n'
+
+        return CVSSdetail
+    
+def Get_Cve_port(port,CVElist):
+    ua = UserAgent()
+    headers = {'User-Agent': ua.random}
+    urlport="https://www.speedguide.net/port.php?port="+port
+    res=requests.get(urlport, headers=headers)
+    sp=BeautifulSoup(res.text,'html.parser')
+    detal=sp.find_all("a",string=re.compile("^CVE-"))
+    cve=""
+    for i in range(len(detal)):
+        k=0
+        for j in range(len(CVElist)):
+            if detal[i].text==CVElist[j]:
+                cve+=detal[i].text+"*"+'\n'
+                k+=1
+        if k==0:
+            cve+=detal[i].text+'\n'
+    return (urlport+'\n'+cve)
+
+
+def Get_Cve_KnownAffected(CVE):
+    KnownAffected = ""
+    urlNVD = 'https://nvd.nist.gov/vuln/detail/' + CVE
+    html = requests.get(urlNVD)
+    sp = BeautifulSoup(html.text, 'html.parser')
+    detal = sp.select(".vulnerable")
+    for i in range(len(detal)):
+        KnownAffected += "配置" + str(i + 1) + ":" + '\n' + detal[i].text.replace(" \xa0", '').replace("\n", '') + '\n'
+    return KnownAffected
+
+
+def Get_Cve_civis(CVE):
+    urlcivis="https://cert.civis.net/en/index.php?action=alert&param="+CVE
+    civis="More CVSS:"+'\n'+urlcivis+'\n'
+    return civis
+
+
+#--------------------------None use--------------------------------------------
+#Nvd solution
+def Get_Cve_Solution(CVE):
+    Solution=""
+    urlNVD='https://nvd.nist.gov/vuln/detail/'+CVE
+    html=requests.get(urlNVD)
+    sp=BeautifulSoup(html.text,'html.parser')
+    detal=sp.select("#p_lt_WebPartZone1_zoneCenter_pageplaceholder_p_lt_WebPartZone1_zoneCenter_VulnerabilityDetail_VulnFormView_VulnHyperlinksPanel table.table-striped.table-condensed.table-bordered.detail-table a")
+    for i in range(len(detal)):
+        Solution+=detal[i].text+'\n'
+    return Solution
+
+
+
+#nvd weakness    
+def Get_Cve_Weakness(CVE):
+    Weakness=""
+    urlNVD='https://nvd.nist.gov/vuln/detail/'+CVE
+    html=requests.get(urlNVD)
+    sp=BeautifulSoup(html.text,'html.parser')
+    detal=sp.select("#p_lt_WebPartZone1_zoneCenter_pageplaceholder_p_lt_WebPartZone1_zoneCenter_VulnerabilityDetail_VulnFormView_VulnTechnicalDetailsDiv table.table-striped.table-condensed.table-bordered.detail-table a")
+    for i in range(len(detal)):
+        Weakness+=detal[i].text+":"+'\n'+detal[i]['href']+'\n'
+    return Weakness
+#------------------------------------------------------------------------------
