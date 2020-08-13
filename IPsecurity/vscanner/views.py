@@ -37,12 +37,14 @@ def output(request):
         
     CVSS = list()     #儲存CVSS
     cwelist = list()    #儲存所有cwe
+    inf += 'Vulns:\n'
+
     # Print vuln information
     for item in host['vulns']:
         CVE = item.replace('!','')
             #print ('Vulns: %s' % item)
-        inf += '\nVulns:' + CVE + '\n'
-        inf += multithreading(CVE,CVSS,cwelist)     #多線程爬取資料
+        inf += CVE + '\n'
+        #inf += multithreading(CVE,CVSS,cwelist)     #多線程爬取資料
         
     data = inf
     print(data)
@@ -52,7 +54,7 @@ def output(request):
  
     
 ### function()  
-def multithreading(CVE,CVSS,cwelist):
+def multithreading(CVE,CVSS,cwelist):             #for detail cve
     Q =Queue()         #FIFO 
    
     Description= threading.Thread(target=Get_Cve_Description, args =(CVE,Q))
