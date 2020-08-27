@@ -6,9 +6,9 @@ import shodan
 import re
 from fake_useragent import UserAgent
 from collections import Counter
-import numpy as np
 import matplotlib.pyplot as plt
 import threading
+import seaborn as sns
 # Create your views here.
 
 
@@ -23,35 +23,64 @@ def output(request):
     #dnsResolve = 'https://api.shodan.io/dns/resolve?hostnames=' + target + '&key=' + SHODAN_API_KEY
 
     hostIP = request.POST.get('param')         #ip input
-    inf = ""                                   #儲存字串
+    Ip_inf = ""                                   #儲存字串
     # Then we need to do a Shodan search on that IP
     host = api.host(hostIP)
-    inf += "IP: %s \n" % host['ip_str']
-    inf += "Organization: %s\n" % host.get('org', 'n/a')
-    inf += "Operating System: %s \n" % host.get('os', 'n/a')
-    inf += "Country:" + str(host.get('country_name', 'n/a'))
+    Ip_inf += "IP: %s \n" % host['ip_str']
+    Ip_inf += "Organization: %s\n" % host.get('org', 'n/a')
+    Ip_inf += "Operating System: %s \n" % host.get('os', 'n/a')
+    Ip_inf += "Country:" + str(host.get('country_name', 'n/a')) +'\n'
    
     #print port
     for item in host['data']:       
-        inf += "Port: %s\n" % item['port']
-        
+        Ip_inf += "Port: %s\n" % item['port']
+    CveList = list()  #儲存CVE
     CVSS = list()     #儲存CVSS
     cwelist = list()    #儲存所有cwe
-    inf += 'Vulns:\n'
+    Cve_inf = ""
 
-    # Print vuln information
+    Ip_inf += 'Vulns:'
+
+
     for item in host['vulns']:
         CVE = item.replace('!','')
             #print ('Vulns: %s' % item)
-        inf += CVE + '\n'
+        CveList.append(CVE)
+        Get_Chart(CVE,CVSS,cwelist)
+        Cve_inf += CVE + '\n'
         #inf += multithreading(CVE,CVSS,cwelist)     #多線程爬取資料
-        
-    data = inf
-    print(data)
-    return render(request,'home.html',{'data':data})
- 
     
- 
+    sns.set()    
+    
+    ##長條圖
+    
+    key_value = list(Counter(cwelist).keys())
+    for i in range(len(key_value)):
+        key_value[i] = key_value[i].replace('-', "-\n")
+    value_list = list(Counter(cwelist).values())
+    plt.bar(key_value, value_list)  # s-:方形
+    plt.ylabel("CWE COUNT")
+    plt.savefig('D:\\Local Repositories\\repo1\\IPsecurity\\vscanner\\static\\images\\bar.jpg')
+    
+    plt.clf()       #清除figure
+    ##圓餅圖
+   
+    key_value = list(Counter(CVSS).keys())
+    value_list = list(Counter(CVSS).values())
+    pie_color = ["orange", "red", "limegreen"]
+    plt.pie(value_list, colors=pie_color, labels=key_value, autopct="%2.2f%%")
+   
+    plt.savefig('D:\\Local Repositories\\repo1\\IPsecurity\\vscanner\\static\\images\\pie.jpg')
+        
+
+
+    return render(request,'home.html',{'data':Ip_inf,'cve_list':CveList})
+
+def detail(request,CVE):
+    
+    
+    return render(request,'detail.html',)
+    
     
 ### function()  
 def multithreading(CVE,CVSS,cwelist):             #for detail cve
@@ -106,6 +135,18 @@ def Get_Cve_Description(CVE,q):     # q = Queue
     #print(Description)
     q.put(Description)
     #return Description
+
+def Get_Chart(CVE,CVSS,cwelist):
+    urlNVD='https://nvd.nist.gov/vuln/detail/'+CVE
+    res=requests.get(urlNVD)
+    sp=BeautifulSoup(res.text,'html.parser') 
+    detal=sp.select(".severityDetail")
+ 
+    CVSS.append(detal[1].text.split(' ')[2])
+     
+    detal=sp.select("#vulnTechnicalDetailsDiv table.table-striped.table-condensed.table-bordered.detail-table a")
+    for i in range(len(detal)):     
+        cwelist.append(detal[i].text)
 
 def Get_Cve_NVD(CVE,CVSS,cwelist,q):
     urlNVD='https://nvd.nist.gov/vuln/detail/'+CVE
