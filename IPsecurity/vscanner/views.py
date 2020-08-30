@@ -1,14 +1,17 @@
 from django.shortcuts import render
 import requests
+import os
 from queue import Queue
 from bs4 import BeautifulSoup 
 import shodan
 import re
 from fake_useragent import UserAgent
 from collections import Counter
-import matplotlib.pyplot as plt
 import threading
 import seaborn as sns
+import matplotlib
+matplotlib.use('Agg')
+from matplotlib import pyplot as plt
 # Create your views here.
 
 
@@ -23,6 +26,7 @@ def output(request):
     #dnsResolve = 'https://api.shodan.io/dns/resolve?hostnames=' + target + '&key=' + SHODAN_API_KEY
 
     hostIP = request.POST.get('param')         #ip input
+   
     Ip_inf = ""                                   #儲存字串
     # Then we need to do a Shodan search on that IP
     host = api.host(hostIP)
@@ -39,7 +43,7 @@ def output(request):
     cwelist = list()    #儲存所有cwe
     Cve_inf = ""
 
-    Ip_inf += 'Vulns:'
+
 
 
     for item in host['vulns']:
@@ -53,16 +57,18 @@ def output(request):
     sns.set()    
     
     ##長條圖
-    
+    path_root = os.path.abspath('.')  # 表示當前所處的絕對路徑
+   
+
     key_value = list(Counter(cwelist).keys())
     for i in range(len(key_value)):
         key_value[i] = key_value[i].replace('-', "-\n")
     value_list = list(Counter(cwelist).values())
     plt.bar(key_value, value_list)  # s-:方形
     plt.ylabel("CWE COUNT")
-    plt.savefig('D:\\Local Repositories\\repo1\\IPsecurity\\vscanner\\static\\images\\bar.jpg')
+    plt.savefig(path_root + '\\vscanner\\static\\images\\bar.jpg')
     
-    plt.clf()       #清除figure
+    plt.close()      #清除figure
     ##圓餅圖
    
     key_value = list(Counter(CVSS).keys())
@@ -70,11 +76,12 @@ def output(request):
     pie_color = ["orange", "red", "limegreen"]
     plt.pie(value_list, colors=pie_color, labels=key_value, autopct="%2.2f%%")
    
-    plt.savefig('D:\\Local Repositories\\repo1\\IPsecurity\\vscanner\\static\\images\\pie.jpg')
-        
+    plt.savefig(path_root + '\\vscanner\\static\\images\\pie.jpg')
+    plt.close()
+    
+    cve_dict = dict(zip(CveList,CVSS))
 
-
-    return render(request,'home.html',{'data':Ip_inf,'cve_list':CveList})
+    return render(request,'home.html',{'data':Ip_inf,'cve_list':cve_dict})
 
 def detail(request,CVE):
     

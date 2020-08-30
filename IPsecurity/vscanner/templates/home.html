@@ -3,6 +3,7 @@
 {% load static %}
 
 {% block content %}
+
 	<form action="output" method="post">
 		{% csrf_token %}
 		Input IP:
@@ -10,21 +11,40 @@
 		<br>
 		<input type="submit" value="Search">
 	</form>
-	
+<div class="row">
+	<div class="6u 12u(3)">
 	{% if data %}
 	{{data|linebreaks}}
 	{% endif %}
 	
-	 {% if cve_list %}
+	{% if cve_list %}
   <ul>
-    {% for cve in cve_list %}
+	  <h3>Vulns:</h3>
+    {% for cve,cvss in cve_list.items %}
       <li>
-        <a href="{% url 'cve_detail' cve %}">{{cve}}</a> 
+        <a href="{% url 'cve_detail' cve %}">{{cve}}</a>
+		
+		{% if cvss == "HIGH" %}
+			:<span style="background-color:red;color:white">{{cvss}}</span> 
+		{% elif cvss == "MEDIUM" %}
+			:<span style="background-color:gold;color:white">{{cvss}}</span> 
+		{% elif cvss == "LOW" %}
+			:<span style="background-color:green;color:white">{{cvss}}</span> 
+		{% endif %}
+		
       </li>
     {% endfor %}
   </ul>
-  {% else %}
-    <p>There are no CVE</p>
-  {% endif %}       
+	{% endif %}       
+	</div>
 	
+	{% if cve_list %}
+	<div class="6u 12u(3)">
+		<h3>cwe分布圖</h3>
+		<img src="{% static 'images/bar.jpg' %}" width="60%"> <br></br>
+		<h3>cve嚴重分布圖</h3>
+		<img src="{% static 'images/pie.jpg' %}" width="60%">
+	</div>
+	{% endif %}
+</div>
 {% endblock %}
