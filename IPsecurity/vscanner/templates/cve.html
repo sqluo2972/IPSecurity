@@ -19,4 +19,24 @@
 		<input type="submit" value="Search">
 	</form>
 
+	{% if cve_list %}
+  <ul>
+	  <h3>CVE:</h3>
+    {% for cve,cvss in cve_list.items %}
+      <li>
+        <a href="{% url 'cve_detail' cve %}">{{cve}}</a>
+		
+		{% if cvss == "HIGH" %}
+			:<span style="background-color:red;color:white">{{cvss}}</span> 
+		{% elif cvss == "MEDIUM" %}
+			:<span style="background-color:gold;color:white">{{cvss}}</span> 
+		{% elif cvss == "LOW" %}
+			:<span style="background-color:green;color:white">{{cvss}}</span> 
+		{% endif %}
+		
+      </li>
+    {% endfor %}
+  </ul>
+	{% endif %}       
+
 {% endblock %}

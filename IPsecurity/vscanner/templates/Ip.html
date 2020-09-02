@@ -1,0 +1,67 @@
+{% extends "base_generic.html" %}
+<!-- Add additional CSS in static file -->
+{% load static %}
+
+{% block content %}
+
+	<form action="output" method="post">
+		{% csrf_token %}
+		Input IP:
+		<input placeholder="input Ip address" type="text" name="param" required><br><br>		
+		<br>
+		<input type="submit" value="Search">
+	</form>
+	<form action="cve" method="post">
+		{% csrf_token %}
+		Input CVE:
+		<input placeholder="input CVE" type="text" name="cve" required><br><br>		
+		<br>
+		<input type="submit" value="Search">
+	</form>
+<div class="row">
+	<div class="6u 12u(3)">
+	{% if data %}
+	{{data|linebreaks}}
+	{% endif %}
+	</div>
+	
+	<div class="6u 12u(3)">
+		{% if cve_list %}
+		<h3>cwe分布圖</h3>
+		<img src="{% static 'images/bar.jpg' %}" width="60%"> <br></br>
+		{% endif %}
+	</div>
+</div>
+<div class="row">
+	<div class="6u 12u(3)">
+	{% if cve_list %}
+  <ul>
+	  <h3>CVE:</h3>
+    {% for cve,cvss in cve_list.items %}
+      <li>
+        <a href="{% url 'cve_detail' cve %}">{{cve}}</a>
+		
+		{% if cvss == "HIGH" %}
+			:<span style="background-color:red;color:white">{{cvss}}</span> 
+		{% elif cvss == "MEDIUM" %}
+			:<span style="background-color:gold;color:white">{{cvss}}</span> 
+		{% elif cvss == "LOW" %}
+			:<span style="background-color:green;color:white">{{cvss}}</span> 
+		{% endif %}
+		
+      </li>
+    {% endfor %}
+  </ul>
+	{% endif %}       
+	</div>
+	
+	
+	<div class="6u 12u(3)">
+	{% if cve_list %}
+		<h3>cve嚴重分布圖</h3>
+		<img src="{% static 'images/pie.jpg' %}" width="60%">
+	{% endif %}
+	</div>
+	
+</div>
+{% endblock %}

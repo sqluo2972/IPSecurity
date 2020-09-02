@@ -81,7 +81,19 @@ def output(request):
     
     cve_dict = dict(zip(CveList,CVSS))
 
-    return render(request,'home.html',{'data':Ip_inf,'cve_list':cve_dict})
+    return render(request,'Ip.html',{'data':Ip_inf,'cve_list':cve_dict})
+
+def cve(request):
+    cve = request.POST.get('cve')  # ip input
+    cve_list = list(cve.split(' '))
+    cvss = list()
+    cwe = list()
+    for cve in cve_list:
+        Get_Chart(cve, cvss, cwe)
+    cve_dict = dict(zip(cve_list,cvss))
+
+    return render(request,'cve.html',{'cve_list':cve_dict})
+
 
 def detail(request,CVE):
     
