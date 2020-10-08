@@ -3,28 +3,6 @@
 {% load static %}
 
 {% block content %}
-	<form action="output" method="post">
-		{% csrf_token %}
-		Input IP:
-		<input placeholder="input Ip address" type="text" name="param" required><br><br>		
-		<br>
-		<input type="submit" value="Search">
-	</form>
-	
-	{% if data %}
-	{{data|linebreaks}}
-	{% endif %}
-	
-	 {% if cve_list %}
-  <ul>
-    {% for cve in cve_list %}
-      <li>
-        <a href="">{{cve}}</a> 
-      </li>
-    {% endfor %}
-  </ul>
-  {% else %}
-    <p>There are no CVE</p>
-  {% endif %}       
+	{{ cve }}
 	
 {% endblock %}

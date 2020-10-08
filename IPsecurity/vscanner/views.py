@@ -1,4 +1,5 @@
 from django.shortcuts import render
+from django.http import HttpResponse
 import requests
 import os
 from queue import Queue
@@ -10,6 +11,8 @@ from collections import Counter
 import threading
 import seaborn as sns
 import matplotlib
+from docx import Document
+from docx.shared import Inches
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 # Create your views here.
@@ -83,6 +86,17 @@ def output(request):
 
     return render(request,'Ip.html',{'data':Ip_inf,'cve_list':cve_dict})
 
+def report(request):
+    path_root = os.path.abspath('.')
+    document = Document(path_root + '\\vscanner\\static\\word\\report.docx')
+
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    response['Content-Disposition'] = 'attachment; filename=140.138.144.66 Report.docx'
+    document.save(response)
+
+    return response
+    
+
 def cve(request):
     cve = request.POST.get('cve')  # ip input
     cve_list = list(cve.split(' '))
@@ -96,9 +110,9 @@ def cve(request):
 
 
 def detail(request,CVE):
+
     
-    
-    return render(request,'detail.html',)
+    return render(request,'detail.html',{'cve':CVE})
     
     
 ### function()  
@@ -184,11 +198,11 @@ def Get_Cve_NVD(CVE,CVSS,cwelist,q):
     detal=sp.select("#vulnHyperlinksPanel table.table-striped.table-condensed.table-bordered.detail-table a")
     for i in range(len(detal)):
         Solution+=detal[i].text+'\n'
-      
+    CweName = sp.select("#vulnTechnicalDetailsDiv table.table-striped.table-condensed.table-bordered.detail-table td")
     Weakness="弱點枚舉:"+'\n'
     detal=sp.select("#vulnTechnicalDetailsDiv table.table-striped.table-condensed.table-bordered.detail-table a")
     for i in range(len(detal)):
-        Weakness+=detal[i].text+":"+'\n'+detal[i]['href']+'\n'
+        Weakness+=detal[i].text+":"+CweName[1+i*3].text+'\n'+detal[i]['href']+'\n'
         cwelist.append(detal[i].text)
    
     allNVD =Score+Solution+Weakness    

@@ -61,7 +61,12 @@
 		<h3>cve嚴重分布圖</h3>
 		<img src="{% static 'images/pie.jpg' %}" width="60%">
 	{% endif %}
-	</div>
-	
+	</div>	
 </div>
+<div class="row">
+	<div class="6u 12u(3)">
+		<button onclick="location.href='{% url 'report' %}'">產生報告</button>
+	</div>
+</div>
+
 {% endblock %}
