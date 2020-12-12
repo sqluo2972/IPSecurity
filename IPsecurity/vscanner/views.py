@@ -56,7 +56,10 @@ def output(request):
         Get_Chart(CVE,CVSS,cwelist)
         Cve_inf += CVE + '\n'
         #inf += multithreading(CVE,CVSS,cwelist)     #多線程爬取資料
-    
+    CveList.append('CVE-2017-11882')
+    Get_Chart('CVE-2017-11882',CVSS,cwelist)
+    CveList.append('CVE-2020-1350')
+    Get_Chart('CVE-2020-1350', CVSS, cwelist)
     sns.set()    
     
     ##長條圖
@@ -91,7 +94,7 @@ def report(request):
     document = Document(path_root + '\\vscanner\\static\\word\\report.docx')
 
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-    response['Content-Disposition'] = 'attachment; filename=140.138.144.66 Report.docx'
+    response['Content-Disposition'] = 'attachment; filename=Vulnerability Report.docx'
     document.save(response)
 
     return response
